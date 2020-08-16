@@ -1,0 +1,28 @@
+{
+  "name": "slacker-cli",
+  "version": "1.0.0",
+  "description": "",
+  "bin": {
+    "slacker": "bin/slacker"
+  },
+  "scripts": {
+    "start": "bin/slacker",
+    "start:compiled": "npm run build && bin/slacker --compiled-build",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "type-check": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [],
+  "author": "Wataru Oguchi <wataru@hey.com> (https://twitter.com/watarutwt/)",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^14.0.27",
+    "@types/yargs": "^15.0.5",
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.7"
+  },
+  "dependencies": {
+    "@slack/web-api": "^5.11.0",
+    "yargs": "^15.4.1"
+  }
+}
