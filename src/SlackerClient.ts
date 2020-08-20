@@ -40,19 +40,23 @@ export class SlackerClient {
     channel: channel,
     lastOldestMessage: { ts: number } = { ts: 0 }
   ): Promise<message | null> {
-    const { messages } = await this.client.conversations.history({
+    const history = await this.client.conversations.history({
       channel: channel.id,
       latest: lastOldestMessage.ts.toString() || "now",
       limit: 5,
     });
+    if (!Array.isArray(history.messages) || history.messages.length === 0)
+      return null;
+    const messages = history.messages.sort((a, b) => a.ts - b.ts);
 
-    if (!Array.isArray(messages) || messages.length === 0) return null;
     const lastWorthwhileMessages = messages.filter((message) => {
       // Filter out "<This bot> has joined the channel".
       return message.subtype !== "channel_join" && message.ts;
     });
     if (lastWorthwhileMessages.length) {
-      const [lastWorthwhileMessage] = lastWorthwhileMessages;
+      // The last message BEFORE the `channel_join`
+      const lastWorthwhileMessage =
+        lastWorthwhileMessages[lastWorthwhileMessages.length - 1];
       return lastWorthwhileMessage;
     } else {
       // Try fetching more messages.
