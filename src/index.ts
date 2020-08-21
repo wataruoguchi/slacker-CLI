@@ -37,7 +37,7 @@ async function run(): Promise<void> {
 
 async function archiveDatedChannels(
   slackerClient: SlackerClient,
-  devDate: number = 31
+  devDate: number
 ) {
   const channels = await slackerClient.getActiveChannels();
   const currentEpoch = Date.now() / 1000;
@@ -48,11 +48,15 @@ async function archiveDatedChannels(
       const lastWorthwhileMessage = await slackerClient.getLastWorthwhileMessage(
         channel
       );
-      if (currentEpoch - lastWorthwhileMessage.ts > oneMonthEpoch) {
-        const result = await slackerClient.archiveChannel(channel);
-        console.log(
-          `Archiving '${channel.name}' - ${result ? "succeeded" : "failed"}.`
-        );
+      if (lastWorthwhileMessage) {
+        if (currentEpoch - lastWorthwhileMessage.ts > oneMonthEpoch) {
+          const result = await slackerClient.archiveChannel(channel);
+          console.log(
+            `Archiving '${channel.name}' - ${result ? "succeeded" : "failed"}.`
+          );
+        }
+      } else {
+        console.log(`${channel.name} has no conversations.`);
       }
     })
   );

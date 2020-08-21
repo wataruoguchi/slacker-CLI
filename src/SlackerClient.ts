@@ -51,7 +51,7 @@ export class SlackerClient {
 
     const lastWorthwhileMessages = messages.filter((message) => {
       // Filter out "<This bot> has joined the channel".
-      return message.subtype !== "channel_join" && message.ts;
+      return !message.subtype && message.ts;
     });
     if (lastWorthwhileMessages.length) {
       // The last message BEFORE the `channel_join`
