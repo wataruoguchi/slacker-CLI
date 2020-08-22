@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "channels": [
+    {
+      "id": "1",
+      "name": "valid",
+      "name_normalized": "is_valid",
+      "is_archived": false,
+      "is_general": false,
+      "is_private": false
+    },
+    {
+      "id": "2",
+      "name": "invalid",
+      "name_normalized": "is_archived",
+      "is_archived": true,
+      "is_general": false,
+      "is_private": false
+    },
+    {
+      "id": "3",
+      "name": "second valid",
+      "name_normalized": "is_also_valid",
+      "is_archived": false,
+      "is_general": true,
+      "is_private": false
+    }
+  ],
+  "response_metadata": {
+    "next_cursor": "dGVhbTpDMDYxRkE1UEI="
+  }
+}

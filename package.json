@@ -9,15 +9,19 @@
     "start": "bin/slacker",
     "start:compiled": "npm run build && bin/slacker --compiled-build",
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "type-check": "tsc -p tsconfig.json --noEmit"
   },
   "keywords": [],
   "author": "Wataru Oguchi <wataru@hey.com> (https://twitter.com/watarutwt/)",
   "license": "MIT",
   "devDependencies": {
+    "@types/jest": "^26.0.10",
     "@types/node": "^14.0.27",
     "@types/yargs": "^15.0.5",
+    "jest": "^26.4.0",
+    "nock": "^13.0.4",
+    "ts-jest": "^26.2.0",
     "ts-node": "^8.10.2",
     "typescript": "^3.9.7"
   },

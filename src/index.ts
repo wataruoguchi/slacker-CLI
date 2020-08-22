@@ -1,4 +1,3 @@
-import { WebClient } from "@slack/web-api";
 import yargs from "yargs";
 import { SlackerClient } from "./SlackerClient";
 
@@ -30,8 +29,7 @@ async function run(): Promise<void> {
   if (!token) {
     return Promise.reject("SLACK_TOKEN is required.");
   }
-  const webClient = new WebClient(token);
-  const slackerClient = new SlackerClient(webClient, isDryRun);
+  const slackerClient = new SlackerClient(token, { isDryRun });
   await archiveDatedChannels(slackerClient, devDate);
 }
 

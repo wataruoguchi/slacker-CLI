@@ -1,5 +1,5 @@
-import { WebClient } from "@slack/web-api";
-type channel = {
+import { WebClient, WebClientOptions } from "@slack/web-api";
+export type channel = {
   id: string;
   name: string;
   name_normalized: string;
@@ -8,7 +8,7 @@ type channel = {
   is_private: boolean;
 };
 
-type message = {
+export type message = {
   type: string;
   subtype: string;
   text: string;
@@ -18,10 +18,15 @@ type message = {
 export class SlackerClient {
   client: WebClient;
   isDryRun: boolean;
-  constructor(client: WebClient, isDryRun: boolean = true) {
-    this.client = client;
-    this.isDryRun = isDryRun;
+
+  constructor(
+    token: string,
+    options?: WebClientOptions & { isDryRun: boolean }
+  ) {
+    this.isDryRun = (options && options.isDryRun) || true;
+    this.client = new WebClient(token, options);
   }
+
   async getActiveChannels(): Promise<channel[]> {
     const list = await this.client.conversations.list({
       types: "public_channel",
@@ -36,6 +41,7 @@ export class SlackerClient {
     }
     return channels;
   }
+
   async getLastWorthwhileMessage(
     channel: channel,
     lastOldestMessage: { ts: number } = { ts: 0 }
@@ -64,6 +70,7 @@ export class SlackerClient {
       return this.getLastWorthwhileMessage(channel, oldestMessage);
     }
   }
+
   async archiveChannel(channel: channel): Promise<boolean> {
     // This is a POST request. It should guarded by `isDryRun`.
     if (this.isDryRun) return true;
