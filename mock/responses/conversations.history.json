@@ -27,9 +27,9 @@
       "ts": "1512085950.000217"
     }
   ],
-  "has_more": true,
+  "has_more": false,
   "pin_count": 0,
   "response_metadata": {
-    "next_cursor": "bmV4dF90czoxNTEyMDg1ODYxMDAwNTQz"
+    "next_cursor": ""
   }
 }

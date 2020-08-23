@@ -1,6 +1,5 @@
 import yargs from "yargs";
 import { SlackerClient } from "./SlackerClient";
-
 function getVersion() {
   const version = require("../package.json").version;
   return `v. ${version}`;
@@ -8,7 +7,7 @@ function getVersion() {
 
 async function run(): Promise<void> {
   const usage = `Run with your SLACK_TOKEN.
- e.g.,) SLACK_TOKEN=xoxb-1234567890 slacker --dryRun=0`;
+e.g.,) SLACK_TOKEN=xoxb-1234567890 slacker --dryRun=0`;
   const argv = yargs
     .version(getVersion())
     .usage(usage)
@@ -29,7 +28,9 @@ async function run(): Promise<void> {
   if (!token) {
     return Promise.reject("SLACK_TOKEN is required.");
   }
-  const slackerClient = new SlackerClient(token, { isDryRun });
+  const slackerClient = new SlackerClient(token, {
+    isDryRun,
+  });
   await archiveDatedChannels(slackerClient, devDate);
 }
 
@@ -37,7 +38,7 @@ async function archiveDatedChannels(
   slackerClient: SlackerClient,
   devDate: number
 ) {
-  const channels = await slackerClient.getActiveChannels();
+  const channels = await slackerClient.getChannels();
   const currentEpoch = Date.now() / 1000;
   const oneMonthEpoch = devDate * 24 * 60 * 60; // 31 days. It does not need to be accurate.
 
