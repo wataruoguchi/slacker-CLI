@@ -1,5 +1,5 @@
 import yargs from "yargs";
-import { SlackerClient } from "./SlackerClient";
+import { SlackerClient, LogLevel } from "./SlackerClient";
 function getVersion() {
   const version = require("../package.json").version;
   return `v. ${version}`;
@@ -11,11 +11,26 @@ e.g.,) SLACK_TOKEN=xoxb-1234567890 slacker --dryRun=0`;
   const argv = yargs
     .version(getVersion())
     .usage(usage)
-    .describe(
-      "dryRun",
-      "It prevents critical actions such as archiving channels. Default: 1"
-    )
-    .choices("dryRun", [1, 0]).argv;
+    .options({
+      command: {
+        alias: "c",
+        describe: "Command you want to run",
+        demandOption: true,
+        choices: ["archiveDatedChannels"],
+      },
+      logLevel: {
+        alias: "l",
+        describe: "Slack Client Log Level.",
+        choices: ["DEBUG", "INFO", "WARN", "ERROR"],
+        default: "DEBUG",
+      },
+      dryRun: {
+        alias: "dr",
+        describe: "It prevents critical actions such as archiving channels.",
+        choices: [1, 0],
+        default: 1,
+      },
+    }).argv;
   const isDryRun: boolean = argv.dryRun === 0 ? false : true;
   if (isDryRun) console.log("Dry Run...", isDryRun);
 
@@ -30,6 +45,7 @@ e.g.,) SLACK_TOKEN=xoxb-1234567890 slacker --dryRun=0`;
   }
   const slackerClient = new SlackerClient(token, {
     isDryRun,
+    logLevel: LogLevel[argv.logLevel],
   });
   await archiveDatedChannels(slackerClient, devDate);
 }

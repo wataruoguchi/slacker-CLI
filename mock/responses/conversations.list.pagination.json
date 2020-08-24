@@ -1,0 +1,52 @@
+{
+  "pagination": [
+    {
+      "ok": true,
+      "channels": [
+        {
+          "id": "1",
+          "name": "channel1",
+          "name_normalized": "channel1",
+          "is_archived": false,
+          "is_general": false,
+          "is_private": false
+        }
+      ],
+      "response_metadata": {
+        "next_cursor": "dummy2="
+      }
+    },
+    {
+      "ok": true,
+      "channels": [
+        {
+          "id": "2",
+          "name": "channel2",
+          "name_normalized": "channel2",
+          "is_archived": false,
+          "is_general": false,
+          "is_private": false
+        }
+      ],
+      "response_metadata": {
+        "next_cursor": "dummy3="
+      }
+    },
+    {
+      "ok": true,
+      "channels": [
+        {
+          "id": "3",
+          "name": "channel3",
+          "name_normalized": "channel3",
+          "is_archived": false,
+          "is_general": false,
+          "is_private": false
+        }
+      ],
+      "response_metadata": {
+        "next_cursor": ""
+      }
+    }
+  ]
+}

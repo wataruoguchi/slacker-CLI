@@ -5,6 +5,9 @@ import {
   WebAPICallResult,
   WebAPICallOptions,
 } from "@slack/web-api";
+
+export { LogLevel };
+
 export type channel = {
   id: string;
   name: string;
@@ -27,7 +30,7 @@ export class SlackerClient {
 
   constructor(
     token: string,
-    options?: WebClientOptions & { isDryRun: boolean }
+    options?: WebClientOptions & { isDryRun?: boolean }
   ) {
     const defaultOptions = {
       logLevel: LogLevel.DEBUG,

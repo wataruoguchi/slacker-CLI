@@ -1,5 +1,5 @@
 const nock = require("nock");
-import { SlackerClient, channel } from "./SlackerClient";
+import { SlackerClient, channel, LogLevel } from "./SlackerClient";
 const conversationsHistory = require("../mock/responses/conversations.history.json");
 const conversationsList = require("../mock/responses/conversations.list.json");
 
@@ -14,14 +14,13 @@ const channel: channel = {
 
 describe("SlackerClient", () => {
   let slackerClient;
-  let scope = nock("https://slack.com").persist();
+  let scope;
+
   beforeEach(() => {
-    // TODO - single page. We should test for pagination.
-    scope.post("/api/conversations.history").reply(200, conversationsHistory);
-    // TODO - single page. We should test for pagination.
-    scope.post("/api/conversations.list").reply(200, conversationsList);
-    scope.post("/api/conversations.join").reply(200, { ok: true });
-    slackerClient = new SlackerClient("xoxb-faketoken");
+    scope = nock("https://slack.com");
+    slackerClient = new SlackerClient("xoxb-faketoken", {
+      logLevel: LogLevel.ERROR,
+    });
   });
 
   describe("General", () => {
@@ -30,7 +29,14 @@ describe("SlackerClient", () => {
       expect(ok).toBe(true);
     });
   });
+
   describe("Without cursor", () => {
+    beforeEach(() => {
+      scope.post("/api/conversations.join").reply(200, { ok: true });
+      scope.post("/api/conversations.history").reply(200, conversationsHistory);
+      scope.post("/api/conversations.list").reply(200, conversationsList);
+    });
+
     test("getLastWorthwhileMessage", async () => {
       const message = await slackerClient.getLastWorthwhileMessage(channel);
       expect(message).toEqual({
