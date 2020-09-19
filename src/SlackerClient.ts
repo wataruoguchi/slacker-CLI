@@ -5,8 +5,10 @@ import {
   WebAPICallResult,
   WebAPICallOptions,
 } from "@slack/web-api";
+const NodeCache = require("node-cache");
+const listAttributes = require("./listAttributes.json");
 
-export { LogLevel };
+export { LogLevel, WebAPICallOptions, WebAPICallResult };
 
 export type channel = {
   id: string;
@@ -24,9 +26,20 @@ export type message = {
   ts: number;
 };
 
+export type user = {
+  id: string;
+};
+
+type breakCondition = (
+  page: WebAPICallResult,
+  result: WebAPICallResult[]
+) => boolean;
+
 export class SlackerClient {
-  private readonly client: WebClient;
+  private readonly token: string;
+  public readonly client: WebClient;
   public readonly isDryRun: boolean;
+  public readonly cache: any;
 
   constructor(
     token: string,
@@ -36,30 +49,68 @@ export class SlackerClient {
       logLevel: LogLevel.DEBUG,
     };
     this.isDryRun = (options && options.isDryRun) || true;
+    this.token = token;
     this.client = new WebClient(token, {
       ...defaultOptions,
       ...options,
     });
+    this.cache = new NodeCache();
+    this.cache.on("set", (key: string) => {
+      const dateKey = "dates";
+      if (key === dateKey) return;
+      const dates = this.cache.get(dateKey) || {};
+      dates[key] = Math.round(new Date().getTime() / 1000);
+      // throw new Error(
+      //   "SET is invoked with " + dateKey + " " + JSON.stringify(dates)
+      // );
+      this.cache.set(dateKey, dates);
+      return;
+    });
   }
 
-  // TODO This might be expensive. We should have the result cached. Maybe by timestamp.
   /**
-   * https://github.com/slackapi/node-slack-sdk/blob/c379711831e7077762fcbec016788b9b0bee49f1/docs/_packages/web_api.md#pagination
-   *
+   * @param key cache key = method name. e.g., conversations.history.
+   */
+  private buildCacheKey(key: string, options?: WebAPICallOptions): string {
+    const defaultCacheKeys = [this.token.slice(-4), key];
+    return (options && Object.keys(options).length
+      ? [...defaultCacheKeys, JSON.stringify(options)]
+      : defaultCacheKeys
+    ).join("-");
+  }
+
+  /**
+   * Get cached dates (Unix time).
+   */
+  public getCacheDates() {
+    return this.cache.get("dates") || {};
+  }
+
+  /**
+   * @param key Optional. cache key = method name. e.g., conversations.history. If this is not set, bust all caches.
+   */
+  public bustCache(key?: string): number {
+    const cacheKey = key ? this.buildCacheKey(key) : undefined;
+    const allKeys = this.cache.keys();
+    const keys: string[] =
+      cacheKey && allKeys.includes(cacheKey) ? [cacheKey] : allKeys;
+    return this.cache.del(keys);
+  }
+
+  /**
    * @param method e.g., conversations.history
    * @param options
    * @param breakCondition `result` - pages we fetched. `page` - the last page we fetched.
+   * https://github.com/slackapi/node-slack-sdk/blob/c379711831e7077762fcbec016788b9b0bee49f1/docs/_packages/web_api.md#pagination
    */
   private async paginate(
     method: string,
     options?: WebAPICallOptions,
-    breakCondition?: (
-      page: WebAPICallResult,
-      result: WebAPICallResult[]
-    ) => boolean
+    breakCondition?: breakCondition
   ): Promise<WebAPICallResult[]> {
     const result = [];
     for await (const page of this.client.paginate(method, options)) {
+      if (!page.ok) break;
       result.push(page);
       if (breakCondition && breakCondition(page, result)) {
         break;
@@ -69,90 +120,34 @@ export class SlackerClient {
   }
 
   /**
-   * Fetch channels. See default options for more details.
+   * @param method e.g., conversations.history
    * @param options
+   * @param breakCondition `result` - pages we fetched. `page` - the last page we fetched.
    */
-  public async getChannels(options?: WebAPICallOptions): Promise<channel[]> {
-    const defaultOptions: WebAPICallOptions = {
-      types: "public_channel",
-      exclude_archived: true,
-    };
-    const lists = await this.paginate("conversations.list", {
-      ...defaultOptions,
-      ...options,
-    });
-    const channels: channel[] = flattenWebAPICallResultByAttrName(
-      lists,
-      "channels"
-    );
-
-    for (const channel of channels) {
-      // Let the bot join all the channels.
-      await this.client.conversations.join({ channel: channel.id });
-    }
-    return channels;
-  }
-
-  public async getLastWorthwhileMessage(
-    channel: channel,
-    options?: WebAPICallOptions
-  ): Promise<message | null> {
-    const defaultOptions: WebAPICallOptions = {
-      limit: 5,
-    };
-
-    /**
-     * Ignore the message that has no `subtype` - It tends to be a message from bots.
-     * Filter out "<This bot> has joined the channel".
-     * @param message
-     */
-    function messageFilter(message: any) {
-      return !message.subtype && message.ts;
-    }
-
-    /**
-     * Break when there's a message that doesn't have `subtype`.
-     * @param page
-     */
-    function breakCondition(page: WebAPICallResult): boolean {
-      return (
-        page.messages &&
-        Array.isArray(page.messages) &&
-        page.messages.filter(messageFilter).length > 0
+  public async getList(
+    method: string,
+    options?: WebAPICallOptions,
+    breakCondition?: breakCondition
+  ): Promise<any[]> {
+    if (!listAttributes[method])
+      throw new Error(
+        `Endpoint ${method} was not found in listAttributes.json. The JSON needs to be maintained.`
       );
-    }
 
-    const histories = await this.paginate(
-      "conversations.history",
-      {
-        ...defaultOptions,
-        ...options,
-        channel: channel.id,
-      },
-      breakCondition
+    const cacheKey = this.buildCacheKey(method, options);
+
+    // See if we have values cached.
+    const cachedValue = this.cache.get(cacheKey);
+    if (cachedValue) return cachedValue;
+
+    // Let's fetch if the data is not cached.
+    const lists = await this.paginate(method, options, breakCondition);
+    const list = flattenWebAPICallResultByAttrName(
+      lists,
+      listAttributes[method]
     );
-    const lastWorthwhileMessages = flattenWebAPICallResultByAttrName(
-      histories,
-      "messages"
-    ).filter(messageFilter);
-    return lastWorthwhileMessages.length
-      ? lastWorthwhileMessages.slice(-1)[0]
-      : null;
-  }
-
-  public async archiveChannel(
-    channel: channel,
-    options?: WebAPICallOptions
-  ): Promise<boolean> {
-    const defaultOptions: WebAPICallOptions = {};
-    // This is a POST request. It should guarded by `isDryRun`.
-    if (this.isDryRun) return true;
-    const { ok } = await this.client.conversations.archive({
-      ...defaultOptions,
-      ...options,
-      channel: channel.id,
-    });
-    return ok;
+    this.cache.set(cacheKey, list);
+    return list;
   }
 }
 
@@ -167,7 +162,7 @@ function flattenWebAPICallResultByAttrName(
 ): any[] {
   return responses
     .reduce((acc, response) => {
-      // It should be similar to Array.prototype.flat() but for the specific attribute.
+      // It should be similar to Array.prototype.flat() but for the specified attribute.
       if (!response[attrName])
         throw new Error(
           `NOSUCHATTR: ${attrName} - response: ${JSON.stringify(response)}`

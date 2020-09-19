@@ -1,70 +1,94 @@
 const nock = require("nock");
-import { SlackerClient, channel, LogLevel } from "./SlackerClient";
+import { SlackerClient, LogLevel } from "./SlackerClient";
 const conversationsHistory = require("../mock/responses/conversations.history.json");
-const conversationsList = require("../mock/responses/conversations.list.json");
-
-const channel: channel = {
-  id: "1",
-  name: "foo",
-  name_normalized: "foo",
-  is_archived: false,
-  is_general: false,
-  is_private: false,
-};
+const conversationsListPagination = require("../mock/responses/conversations.list.pagination.json");
 
 describe("SlackerClient", () => {
-  let slackerClient;
+  let slackerClient: SlackerClient;
   let scope;
-
   beforeEach(() => {
     scope = nock("https://slack.com");
-    slackerClient = new SlackerClient("xoxb-faketoken", {
+    slackerClient = new SlackerClient("xoxb-faketoken1234", {
       logLevel: LogLevel.ERROR,
     });
   });
 
-  describe("General", () => {
-    test("archiveChannel", async () => {
-      const ok = await slackerClient.archiveChannel(channel);
-      expect(ok).toBe(true);
+  describe("getList", () => {
+    test("getList with no cursor", async () => {
+      scope.post("/api/conversations.history").reply(200, conversationsHistory);
+      const list = await slackerClient.getList("conversations.history");
+      expect(Array.isArray(list)).toBeTruthy();
+      expect(list.length).toBe(4);
+    });
+
+    test("Get list with cursor (pagination)", async () => {
+      scope
+        .persist() // This `persist` is important for this test.
+        .post(/api\/conversations\.join/)
+        .reply(200, { ok: true });
+      const [page1, page2, page3] = conversationsListPagination.pagination;
+      scope
+        .post(/api\/conversations\.list/, (body) => {
+          return body.cursor && body.cursor === "dummy2=";
+        })
+        .reply(200, page2);
+      scope
+        .post(/api\/conversations\.list/, (body) => {
+          return body.cursor && body.cursor === "dummy3=";
+        })
+        .reply(200, page3);
+      scope
+        .post(/api\/conversations\.list/, (body) => {
+          return !body.cursor || body.corsor === "";
+        })
+        .reply(200, page1);
+
+      const channels = await slackerClient.getList("conversations.list");
+      expect(channels.length).toBe(3);
+      const [channel1, channel2, channel3] = channels;
+      expect(channel1.id).toBe("1");
+      expect(channel2.id).toBe("2");
+      expect(channel3.id).toBe("3");
     });
   });
 
-  describe("Without cursor", () => {
+  describe("cache", () => {
     beforeEach(() => {
-      scope.post("/api/conversations.join").reply(200, { ok: true });
       scope.post("/api/conversations.history").reply(200, conversationsHistory);
-      scope.post("/api/conversations.list").reply(200, conversationsList);
     });
 
-    test("getLastWorthwhileMessage", async () => {
-      const message = await slackerClient.getLastWorthwhileMessage(channel);
-      expect(message).toEqual({
-        text: "What, you want to smell my shoes better?",
-        ts: "1512104434.000490",
-        type: "message",
-        user: "U061F7AUR",
-      });
+    test("getCacheDates - cacheDates is empty", async () => {
+      const cacheDates = slackerClient.getCacheDates();
+      expect(cacheDates).toEqual({});
     });
 
-    test("getChannels", async () => {
-      const [channel1, channel2] = await slackerClient.getChannels();
-      expect(channel1).toEqual({
-        id: "1",
-        name: "valid",
-        name_normalized: "is_valid",
-        is_archived: false,
-        is_general: false,
-        is_private: false,
-      });
-      expect(channel2).toEqual({
-        id: "3",
-        name: "second valid",
-        name_normalized: "is_also_valid",
-        is_archived: false,
-        is_general: true,
-        is_private: false,
-      });
+    test("getList - add data to cache. cacheDates has a value", async () => {
+      await slackerClient.getList("conversations.history");
+      const cachedList = slackerClient.cache.get("1234-conversations.history");
+      expect(cachedList.length).toBe(4);
+
+      // cacheDates has value.
+      const cacheDates = slackerClient.getCacheDates();
+      expect(cacheDates).not.toEqual({});
+      const [key] = Object.keys(cacheDates);
+      expect(key).toBe("1234-conversations.history");
+      expect(typeof cacheDates[key]).toBe("number");
+    });
+
+    test("bustCache - remove cache values", async () => {
+      // Prepare cache values.
+      await slackerClient.getList("conversations.history");
+      const cachedList = slackerClient.cache.get("1234-conversations.history");
+      expect(cachedList.length).toBe(4);
+      const cacheDates = slackerClient.getCacheDates();
+      expect(cacheDates).not.toEqual({});
+
+      // Bust cache values.
+      slackerClient.bustCache();
+      expect(slackerClient.cache.get("1234-conversations.history")).toEqual(
+        undefined
+      );
+      expect(slackerClient.getCacheDates()).toEqual({});
     });
   });
 });

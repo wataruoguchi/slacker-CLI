@@ -1,5 +1,6 @@
 import yargs from "yargs";
 import { SlackerClient, LogLevel } from "./SlackerClient";
+import { archiveChannels, inviteAllMembers, getChannels } from "./commands";
 function getVersion() {
   const version = require("../package.json").version;
   return `v. ${version}`;
@@ -8,6 +9,7 @@ function getVersion() {
 async function run(): Promise<void> {
   const usage = `Run with your SLACK_TOKEN.
 e.g.,) SLACK_TOKEN=xoxb-1234567890 slacker --dryRun=0`;
+  const commands = ["archiveDatedChannels", "inviteAllMembers", "cache"];
   const argv = yargs
     .version(getVersion())
     .usage(usage)
@@ -16,7 +18,7 @@ e.g.,) SLACK_TOKEN=xoxb-1234567890 slacker --dryRun=0`;
         alias: "c",
         describe: "Command you want to run",
         demandOption: true,
-        choices: ["archiveDatedChannels"],
+        choices: commands,
       },
       logLevel: {
         alias: "l",
@@ -30,14 +32,21 @@ e.g.,) SLACK_TOKEN=xoxb-1234567890 slacker --dryRun=0`;
         choices: [1, 0],
         default: 1,
       },
+      channelName: {
+        describe: "Channel name to invite members.",
+        default: "",
+      },
+      daysToArchive: {
+        describe: "Number of channel expiry days.",
+        default: 31,
+      },
+      bustCacheKey: {
+        describe: "Key name you want to bust.",
+        default: "",
+      },
     }).argv;
   const isDryRun: boolean = argv.dryRun === 0 ? false : true;
   if (isDryRun) console.log("Dry Run...", isDryRun);
-
-  const devDate: number =
-    argv.devDate && !Number.isNaN(Number(argv.devDate))
-      ? Number(argv.devDate)
-      : 31; // For development purpose. Not clean :(
 
   const token: string | undefined = process.env.SLACK_TOKEN;
   if (!token) {
@@ -47,34 +56,28 @@ e.g.,) SLACK_TOKEN=xoxb-1234567890 slacker --dryRun=0`;
     isDryRun,
     logLevel: LogLevel[argv.logLevel],
   });
-  await archiveDatedChannels(slackerClient, devDate);
-}
 
-async function archiveDatedChannels(
-  slackerClient: SlackerClient,
-  devDate: number
-) {
-  const channels = await slackerClient.getChannels();
-  const currentEpoch = Date.now() / 1000;
-  const oneMonthEpoch = devDate * 24 * 60 * 60; // 31 days. It does not need to be accurate.
+  const daysToArchive: number = argv.daysToArchive;
+  const channelName: string = argv.channelName;
 
-  return await Promise.all(
-    channels.map(async (channel) => {
-      const lastWorthwhileMessage = await slackerClient.getLastWorthwhileMessage(
-        channel
-      );
-      if (lastWorthwhileMessage) {
-        if (currentEpoch - lastWorthwhileMessage.ts > oneMonthEpoch) {
-          const result = await slackerClient.archiveChannel(channel);
-          console.log(
-            `Archiving '${channel.name}' - ${result ? "succeeded" : "failed"}.`
-          );
-        }
+  const channels = await getChannels.call(slackerClient);
+
+  switch (argv.command) {
+    case commands[0]:
+      await archiveChannels.call(slackerClient, channels, daysToArchive);
+      break;
+    case commands[1]:
+      await inviteAllMembers.call(slackerClient, channels, channelName);
+      break;
+    case commands[2]:
+      if (argv.bustCacheKey === "") {
+        console.log(slackerClient.getCacheDates());
       } else {
-        console.log(`${channel.name} has no conversations.`);
+        slackerClient.bustCache(argv.bustCacheKey);
       }
-    })
-  );
+      break;
+    default:
+  }
 }
 
 export { run };

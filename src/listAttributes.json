@@ -1,0 +1,5 @@
+{
+  "conversations.list": "channels",
+  "conversations.history": "messages",
+  "users.list": "members"
+}
